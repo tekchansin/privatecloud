@@ -82,7 +82,7 @@ parameters:
     default: cloudkey1
 
 resources:
-  dbserver:
+  wp_dbserver:
     type: OS::Nova::Server
     properties:
       name: wp_dbserver
