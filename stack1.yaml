@@ -7,7 +7,7 @@ parameters:
     type: string
     label: Image name or ID
     description: Image to be used for compute instance
-    default: CentOS-7.1-x86_64
+    default: CentOS-7-x86_64
   flavor:
     type: string
     label: Flavor

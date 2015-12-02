@@ -1,0 +1,143 @@
+heat_template_version: 2015-04-30
+ 
+description: >
+  HOT template to deploy database servers(mariadb) with init script
+
+parameters:
+  key_name:
+    type: string
+    description: Name of keypair to assign to servers
+  image:
+    type: string
+    description: Name of image to use for servers
+    default: CentOS-7-x86_64
+    constraints:
+      - allowed_values: [CentOS-7-x86_64]
+        description: Image Name must be CentOS-7-x86_64
+  flavor:
+    type: string
+    description: Flavor to use for servers
+    default: m1.small
+    constraints:
+      - allowed_values: [m1.small, m1.medium]
+  db_name:
+    type: string
+    description: Database name
+    default: databasetest
+    constraints:
+      - length: { min: 1, max: 64 }
+        description: db_name must be between 1 and 64 characters
+      - allowed_pattern: '[a-zA-Z][a-zA-Z0-9]*'
+        description: >
+          db_name must begin with a letter and contain only alphanumeric
+          characters
+  db_username:
+    type: string
+    description: The Database admin account username
+    default: admin
+    constraints:
+      - length: { min: 1, max: 16 }
+        description: db_username must be between 1 and 64 characters
+      - allowed_pattern: '[a-zA-Z][a-zA-Z0-9]*'
+        description: >
+          db_username must begin with a letter and contain only alphanumeric
+          characters
+  db_password:
+    type: string
+    description: The Database admin account password
+    default: admin
+    hidden: true
+    constraints:
+      - length: { min: 1, max: 41 }
+        description: db_username must be between 1 and 64 characters
+      - allowed_pattern: '[a-zA-Z0-9]*'
+        description: db_password must contain only alphanumeric characters
+  db_root_password:
+    type: string
+    description: Root password for MariaDB
+    default: admin
+    hidden: true
+    constraints:
+      - length: { min: 1, max: 41 }
+        description: db_username must be between 1 and 64 characters
+      - allowed_pattern: '[a-zA-Z0-9]*'
+        description: db_password must contain only alphanumeric characters
+  public_net_id:
+    type: string
+    description: ID of public network for which floating IP addresses will be allocated
+    default: c61fe76f-25ba-4fa6-a3f7-37d59fe17999
+  private_net_id:
+    type: string
+    description: ID of private network into which servers get deployed
+    default: 07f908e4-8321-4d74-a2ed-5088f19c8bd6
+  private_subnet_id:
+    type: string
+    description: ID of private sub network into which servers get deployed
+    default: e75af332-c726-420b-9c35-a69dc6b202ad
+
+  key_name:
+    type: string
+    label: Key name
+    description: Name of key-pair to be used for compute instance
+    default: cloudkey1
+
+resources:
+  dbserver:
+    type: OS::Nova::Server
+    properties:
+      name: wp_dbserver
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - port: { get_resource: dbserver_port }
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash -v
+            yum -y install mariadb mariadb-server
+            systemctl start mariadb.service
+            systemctl enable mariadb.service
+            mysqladmin -u root password db_rootpassword
+            cat << EOF | mysql -u root --password=db_rootpassword
+            CREATE DATABASE db_name;
+            GRANT ALL PRIVILEGES ON db_name.* TO "db_user"@"%" IDENTIFIED BY "db_password";
+            GRANT ALL PRIVILEGES ON db_name.* TO "db_user"@"localhost" IDENTIFIED BY "db_password";
+            FLUSH PRIVILEGES;
+            EXIT
+            EOF
+          params:
+            db_rootpassword: { get_param: db_root_password }
+            db_name: { get_param: db_name }
+            db_user: { get_param: db_username }
+            db_password: { get_param: db_password }
+  dbserver_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: private_net_id }
+      fixed_ips:
+        - subnet_id: { get_param: private_subnet_id }
+      security_groups:
+        - { get_resource: db_security_group }
+  dbfloating_ip:
+    type: "OS::Neutron::FloatingIP"
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: dbserver_port }
+  db_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      description: Neutron security group rules
+      name: db_security_group
+      rules:
+      - remote_ip_prefix: 0.0.0.0/0
+        protocol: tcp
+        port_range_min: 22
+        port_range_max: 22
+      - remote_ip_prefix: 0.0.0.0/0
+        protocol: tcp
+        port_range_min: 3306
+        port_range_max: 3306
+      - remote_ip_prefix: 0.0.0.0/0
+        protocol: icmp
+        direction: ingress
