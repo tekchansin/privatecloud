@@ -1,0 +1,148 @@
+heat_template_version: 2015-04-30
+
+description: >
+  This is a very simple template that illustrates automatic scaling up and down
+  using OS::Heat::AutoScalingGroup. CPU load is generated for
+  15 mins after each instance is spawned, triggering a scale-up event.
+  Once the max number of instances has been reached and the CPU
+  load generation has finished, the number of instances will be scaled
+  back down to 1.
+parameters:
+  key_name:
+    type: string
+    description: Keypair for authentication
+    default: cloudkey1
+  flavor:
+    type: string
+    description: Flavor to use for servers
+    default: m1.small
+    constraints:
+      - allowed_values: [m1.small, m1.medium]
+  image:
+    type: string
+    description: Name of image to use for servers
+    default: CentOS-7-x86_64
+    constraints:
+      - allowed_values: [CentOS-7-x86_64]
+        description: Image Name must be CentOS-7-x86_64
+  public_net_id:
+    type: string
+    label: Public network ID
+    description: ID of the public network to use
+    default: c61fe76f-25ba-4fa6-a3f7-37d59fe17999
+    
+resources:
+  private_network:
+    type: OS::Neutron::Net
+    properties:
+      admin_state_up: true
+      name: private_network
+  private_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      name: private_subnet
+      cidr: 192.168.10.0/24
+      dns_nameservers: [8.8.8.8, 8.8.4.4]
+      enable_dhcp: true
+      network_id: { get_resource: private_network }
+  router:
+    type: OS::Neutron::Router
+    properties:
+      name: router
+      admin_state_up: true
+  router_gw:
+    type: OS::Neutron::RouterGateway
+    properties:
+      network_id: { get_param: public_net_id }
+      router_id: { get_resource: router }
+  router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: router }
+      subnet_id: { get_resource: private_subnet }
+      
+  cloud_config_stress:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        runcmd:
+          - yum update -y
+          - rpm -ivh https://dl.fedoraproject.org/pub/epel/6Server/x86_64/stress-1.0.4-4.el6.x86_64.rpm
+          - stress --cpu 1 --timeout 10m
+          
+  asg:
+    type: OS::Heat::AutoScalingGroup
+    depends_on: private_subnet
+    properties:
+      min_size: 1
+      max_size: 10
+      resource:
+        type: OS::Nova::Server
+        properties:
+          key_name: {get_param: key_name}
+          flavor: {get_param: flavor}
+          image: {get_param: image}
+          networks:
+            - network: { get_resource: private_network }
+          metadata: {"metering.stack": {get_param: "OS::stack_id"}}
+          user_data_format: RAW
+          user_data:
+            get_resource: cloud_config_stress
+
+  scale_up_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: asg}
+      cooldown: 60
+      scaling_adjustment: 1
+  scale_down_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: asg}
+      cooldown: 60
+      scaling_adjustment: '-1'
+
+  cpu_alarm_high:
+    type: OS::Ceilometer::Alarm
+    properties:
+      description: Scale-up if the average CPU > 50% for 1 minute
+      meter_name: cpu_util
+      statistic: avg
+      period: 60
+      evaluation_periods: 1
+      threshold: 50
+      alarm_actions:
+        - {get_attr: [scale_up_policy, alarm_url]}
+      matching_metadata: {'metadata.user_metadata.stack': {get_param: "OS::stack_id"}}
+      comparison_operator: gt
+  cpu_alarm_low:
+    type: OS::Ceilometer::Alarm
+    properties:
+      description: Scale-down if the average CPU < 15% for 10 minutes
+      meter_name: cpu_util
+      statistic: avg
+      period: 600
+      evaluation_periods: 1
+      threshold: 15
+      alarm_actions:
+        - {get_attr: [scale_down_policy, alarm_url]}
+      matching_metadata: {'metadata.user_metadata.stack': {get_param: "OS::stack_id"}}
+      comparison_operator: lt
+
+outputs:
+  scale_up_url:
+    description: >
+      Webhook URL to scale up the group.
+      You can invoke the scale-up operation by doing an HTTP POST to this URL.
+    value: {get_attr: [scale_up_policy, alarm_url]}
+  scale_dn_url:
+    description: >
+      Webhook URL to scale down the group.
+      You can invoke the scale-down operation by doing an HTTP POST to this URL.
+    value: {get_attr: [scale_down_policy, alarm_url]}
+  server_list:
+    description: >
+      List of server names that are part of the group.
+    value: {get_attr: [asg, outputs_list, name]}

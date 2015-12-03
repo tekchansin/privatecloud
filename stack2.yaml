@@ -74,7 +74,6 @@ parameters:
     type: string
     description: ID of private sub network into which servers get deployed
     default: e75af332-c726-420b-9c35-a69dc6b202ad
-
   key_name:
     type: string
     label: Key name
@@ -82,7 +81,7 @@ parameters:
     default: cloudkey1
 
 resources:
-  wp_dbserver:
+  dbserver:
     type: OS::Nova::Server
     properties:
       name: wp_dbserver
