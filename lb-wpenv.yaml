@@ -1,5 +1,5 @@
 heat_template_version: 2014-10-16
-description: A load-balancer server
+description: A load-balancer wordpress server
 parameters:
   image:
     type: string
@@ -23,6 +23,21 @@ parameters:
     description: Network used by the server
 
 resources:
+  web_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: wp_security_group
+      rules:
+        - protocol: tcp
+          port_range_min: 80
+          port_range_max: 80
+        - protocol: tcp
+          port_range_min: 443
+          port_range_max: 443
+        - protocol: icmp
+        - protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
   server:
     type: OS::Nova::Server
     properties:
@@ -44,10 +59,9 @@ resources:
   port:
     type: OS::Neutron::Port
     properties:
-      network: {get_param: network}
+      network: {get_param: private_network}
       security_groups:
-        - web_security_group
-
+        - wp_security_group
 outputs:
   server_ip:
     description: IP Address of the load-balanced server.
