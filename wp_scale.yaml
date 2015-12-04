@@ -45,16 +45,6 @@ resources:
     type: OS::Heat::RandomString
   database_root_password:
     type: OS::Heat::RandomString     
-           
-  db_security_group:
-    type: OS::Neutron::SecurityGroup
-    properties:
-      name: db_security_group
-      rules:
-        - protocol: tcp
-          port_range_min: 3306
-          port_range_max: 3306
-          
   db:
     type: OS::Nova::Server
     properties:
