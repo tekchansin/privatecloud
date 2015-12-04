@@ -50,7 +50,7 @@ resources:
       cooldown: 60
       desired_capacity: 1
       resource:
-        type: /etc/heat/templates/lb-env.yaml
+        type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/lb-env.yaml
         properties:
           flavor: {get_param: flavor}
           image: {get_param: image}
