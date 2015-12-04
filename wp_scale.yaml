@@ -22,11 +22,11 @@ parameters:
   network:
     type: string
     description: Network used by the server
-    default: 2e526792-10f2-43e4-aab5-8f3912571e76
+    default: 6a328376-be26-4be6-a511-110ca0abf35a
   subnet_id:
     type: string
     description: subnet on which the load balancer will be located
-    default: 7bae7b87-4e7c-4e8e-be6f-6b5ea112bbdd
+    default: 4721b82d-b004-45ad-aca8-265f162b7d53
   database_name:
     type: string
     description: Name of the wordpress DB
@@ -63,7 +63,7 @@ resources:
             cat << REPO > /etc/yum.repos.d/local.repo
             [local]
             name=local
-            baseurl=http://192.168.10.21/repos/wordpress
+            baseurl=http://192.168.10.3/repos/wordpress
             enabled=1
             gpgcheck=0
             REPO
@@ -110,7 +110,7 @@ resources:
                 cat << REPO > /etc/yum.repos.d/local.repo
                 [local]
                 name=local
-                baseurl=http://192.168.10.21/repos/wordpress
+                baseurl=http://192.168.10.3/repos/wordpress
                 enabled=1
                 gpgcheck=0
                 REPO
