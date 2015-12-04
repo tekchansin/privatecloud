@@ -23,21 +23,6 @@ parameters:
     description: Network used by the server
 
 resources:
-  wp_security_group:
-    type: OS::Neutron::SecurityGroup
-    properties:
-      name: wp_security_group
-      rules:
-        - protocol: tcp
-          port_range_min: 80
-          port_range_max: 80
-        - protocol: tcp
-          port_range_min: 443
-          port_range_max: 443
-        - protocol: icmp
-        - protocol: tcp
-          port_range_min: 22
-          port_range_max: 22
   server:
     type: OS::Nova::Server
     properties:
