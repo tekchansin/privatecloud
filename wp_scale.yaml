@@ -4,11 +4,19 @@ parameters:
   image:
     type: string
     description: Image used for servers
+<<<<<<< HEAD
     default: CentOS-7-x86_64
   key:
     type: string
     description: SSH key to connect to the servers
     default: cloudkey1
+=======
+    default: CentOS-7.1-x86_64
+  key:
+    type: string
+    description: SSH key to connect to the servers
+    default: itb_cloudkey1
+>>>>>>> 4175f9902a3d75a9524a10cad8d8a9d4bc1d6520
   flavor:
     type: string
     description: flavor used by the web servers
@@ -22,11 +30,19 @@ parameters:
   network:
     type: string
     description: Network used by the server
+<<<<<<< HEAD
     default: 2e526792-10f2-43e4-aab5-8f3912571e76
   subnet_id:
     type: string
     description: subnet on which the load balancer will be located
     default: 7bae7b87-4e7c-4e8e-be6f-6b5ea112bbdd
+=======
+    default: 648d8167-2543-4b98-97f6-9b76d3233356
+  subnet_id:
+    type: string
+    description: subnet on which the load balancer will be located
+    default: c2f655d0-988b-4912-9ac1-54fac7fd1941
+>>>>>>> 4175f9902a3d75a9524a10cad8d8a9d4bc1d6520
   database_name:
     type: string
     description: Name of the wordpress DB
@@ -38,7 +54,11 @@ parameters:
   public_network:
     type: string
     description: UUID of a Neutron external network
+<<<<<<< HEAD
     default: c61fe76f-25ba-4fa6-a3f7-37d59fe17999
+=======
+    default: 2f9bf474-606c-4037-a276-54f5fa23e898
+>>>>>>> 4175f9902a3d75a9524a10cad8d8a9d4bc1d6520
     
 resources:
   database_password:
@@ -46,6 +66,7 @@ resources:
   database_root_password:
     type: OS::Heat::RandomString     
           
+<<<<<<< HEAD
   db_security_group:
     type: OS::Neutron::SecurityGroup
     properties:
@@ -55,6 +76,8 @@ resources:
           port_range_min: 3306
           port_range_max: 3306
 
+=======
+>>>>>>> 4175f9902a3d75a9524a10cad8d8a9d4bc1d6520
   db:
     type: OS::Nova::Server
     properties:
@@ -103,7 +126,11 @@ resources:
       min_size: 1
       max_size: 10
       resource:
+<<<<<<< HEAD
         type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/lb-wpenv.yaml
+=======
+        type: http://192.168.10.21/lb-wpenv.yaml
+>>>>>>> 4175f9902a3d75a9524a10cad8d8a9d4bc1d6520
         properties:
           flavor: {get_param: flavor}
           image: {get_param: image}

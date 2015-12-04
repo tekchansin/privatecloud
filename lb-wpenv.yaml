@@ -23,7 +23,11 @@ parameters:
     description: Network used by the server
 
 resources:
+<<<<<<< HEAD
   wp_security_group:
+=======
+  web_security_group:
+>>>>>>> 4175f9902a3d75a9524a10cad8d8a9d4bc1d6520
     type: OS::Neutron::SecurityGroup
     properties:
       name: wp_security_group
@@ -59,7 +63,11 @@ resources:
   port:
     type: OS::Neutron::Port
     properties:
+<<<<<<< HEAD
       network: {get_param: network}
+=======
+      network: {get_param: private_network}
+>>>>>>> 4175f9902a3d75a9524a10cad8d8a9d4bc1d6520
       security_groups:
         - wp_security_group
 outputs:
