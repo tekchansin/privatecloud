@@ -3,7 +3,7 @@ heat_template_version: 2015-04-30
 description: >
   This is a very simple template that illustrates automatic scaling up and down
   using OS::Heat::AutoScalingGroup. CPU load is generated for
-  15 mins after each instance is spawned, triggering a scale-up event.
+  5 mins after each instance is spawned, triggering a scale-up event.
   Once the max number of instances has been reached and the CPU
   load generation has finished, the number of instances will be scaled
   back down to 1.
@@ -68,7 +68,7 @@ resources:
         runcmd:
           - yum update -y
           - rpm -ivh https://dl.fedoraproject.org/pub/epel/6Server/x86_64/stress-1.0.4-4.el6.x86_64.rpm
-          - stress --cpu 1 --timeout 10m
+          - stress --cpu 1 --timeout 5m
           
   asg:
     type: OS::Heat::AutoScalingGroup
