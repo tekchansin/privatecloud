@@ -4,9 +4,6 @@ description: >
   HOT template to deploy database servers(mariadb) with init script
 
 parameters:
-  key_name:
-    type: string
-    description: Name of keypair to assign to servers
   image:
     type: string
     description: Name of image to use for servers
