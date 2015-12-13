@@ -74,6 +74,7 @@ resources:
     type: OS::Heat::AutoScalingGroup
     depends_on: private_subnet
     properties:
+      cooldown: 60
       min_size: 1
       max_size: 5
       resource:
