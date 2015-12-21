@@ -41,9 +41,6 @@ parameters:
     default: eab1f09e-cbe8-439d-87d8-a11dd27050f1
     
 resources:
-  database_password:
-    type: OS::Heat::RandomString
-    
   mysql:
     type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/mysql-env.yaml
     properties:
