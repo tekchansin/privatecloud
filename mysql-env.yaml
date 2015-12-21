@@ -7,7 +7,7 @@ parameters:
     type: string
     label: Image name or ID
     description: Image to be used for server. Please use an Ubuntu based image.
-    default: trusty-server-cloudimg-amd64
+    default: CentOS-7-x86_64
   flavor:
     type: string
     label: Flavor
@@ -17,12 +17,12 @@ parameters:
     type: string
     label: Key name
     description: Name of key-pair to be installed on the compute instance.
-    default: my_key
+    default: cloudkey1
   private_network:
     type: string
     label: Private network name or ID
     description: Network to attach server to.
-    default: private
+    default: 71717835-9853-4157-9caf-170b5eba23c7
   database_name:
     type: string
     label: Database name
@@ -31,9 +31,13 @@ parameters:
     type: string
     label: Database username
     description: Name of the database user.
+  database_password:
+    type: string
+    label: Database username
+    description: Name of the database user.
  
 resources:
-  database_password1:
+  database_password:
     type: OS::Heat::RandomString
   database_root_password:
     type: OS::Heat::RandomString     
@@ -78,7 +82,7 @@ resources:
             $db_rootpassword: {get_attr: [database_root_password, value]}
             $db_name: {get_param: database_name}
             $db_user: {get_param: database_user}
-            $db_password: {get_attr: [database_password1, value]}
+            $db_password: {get_attr: [database_password, value]}
 outputs:
   name:
     description: Name of the MySQL instance.

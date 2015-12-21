@@ -41,16 +41,19 @@ parameters:
     default: eab1f09e-cbe8-439d-87d8-a11dd27050f1
     
 resources:
+  database_password:
+    type: OS::Heat::RandomString
+    
   mysql:
     type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/mysql-env.yaml
     properties:
       image: { get_param: image }
       flavor: { get_param: flavor }
       key: { get_param: key }
-      private_network: { get_attr: [private_network, name] }
+      private_network: { get_param: private_network }
       database_name: {get_param: database_name}
       database_user: {get_param: database_user}
-      
+      database_password: {get_attr: [database_password, value]}
   asg:
     type: OS::Heat::AutoScalingGroup
     properties:
@@ -110,7 +113,7 @@ resources:
                 $db_name: {get_param: database_name}
                 $db_user: {get_param: database_user}
                 $db_password: {get_attr: [database_password, value]}
-                $db_host: {get_attr: [db, first_address]}
+                $db_host: {get_attr: [mysql, first_address]}
                 
   web_server_scaleup_policy:
     type: OS::Heat::ScalingPolicy
