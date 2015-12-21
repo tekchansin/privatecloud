@@ -33,25 +33,24 @@ parameters:
     description: Name of the database user.
  
 resources:
-  database_root_password:
+  database_password:
     type: OS::Heat::RandomString
-
-    
+  database_root_password:
+    type: OS::Heat::RandomString     
   mysql_instance:
     type: OS::Nova::Server
     properties:
       security_groups: 
         - db_security_group
-      image: { get_param: image }
-      flavor: { get_param: flavor }
-      key_name: { get_param: key }
+      flavor: {get_param: database_flavor}
+      image: {get_param: image}
+      key_name: {get_param: key}
       networks: [{network: {get_param: network} }]
       user_data_format: RAW
       user_data:
         str_replace:
           template: |
-            #!/bin/bash
-            # install MySQL
+            #!/bin/bash -v
             setenforce 0
             cat << REPO > /etc/yum.repos.d/local.repo
             [local]
@@ -61,26 +60,17 @@ resources:
             gpgcheck=0
             REPO
             yum -y install mariadb mariadb-server
-
- 
-            # configure MySQL root password
-            mysqladmin -u root password $db_rootpassword
- 
-            # listen on all network interfaces
-            sed -i "s/bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/my.cnf
- 
-            # restart service
-
             systemctl enable mariadb.service
             systemctl start mariadb.service
             firewall-cmd --permanent --add-port=3306/tcp
             firewall-cmd --reload
- 
-            # create wordpress database
+            
+            mysqladmin -u root password $db_rootpassword
+            
             cat << EOF | mysql -u root --password=$db_rootpassword
             CREATE DATABASE $db_name;
             GRANT ALL PRIVILEGES ON $db_name.* TO "$db_user"@"%"
-            IDENTIFIED BY "ddddddd";
+            IDENTIFIED BY "$db_password";
             FLUSH PRIVILEGES;
             EXIT
             EOF
@@ -88,10 +78,7 @@ resources:
             $db_rootpassword: {get_attr: [database_root_password, value]}
             $db_name: {get_param: database_name}
             $db_user: {get_param: database_user}
-
- 
-            # notify heat that we are done here
-            wc_notify --data-binary '{"status": "SUCCESS"}'
+            $db_password: {get_attr: [database_password, value]}
 outputs:
   name:
     description: Name of the MySQL instance.
