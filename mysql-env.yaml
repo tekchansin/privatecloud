@@ -95,7 +95,7 @@ resources:
             $db_rootpassword: {get_attr: [database_root_password, value]}
             $db_name: {get_param: database_name}
             $db_user: {get_param: database_user}
-            $db_password: 123456
+            $db_password: 111111
  
             # notify heat that we are done here
             wc_notify --data-binary '{"status": "SUCCESS"}'
