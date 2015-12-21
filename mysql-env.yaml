@@ -35,10 +35,14 @@ parameters:
 resources:
   database_root_password:
     type: OS::Heat::RandomString
-
-  database_passwordaa:
+    properties:
+      length: 32
+      sequence: lettersdigits
+  database_password:
     type: OS::Heat::RandomString
-
+    properties:
+      length: 32
+      sequence: lettersdigits
   port:
     type: OS::Neutron::Port
     properties:
@@ -87,7 +91,7 @@ resources:
             cat << EOF | mysql -u root --password=$db_rootpassword
             CREATE DATABASE $db_name;
             GRANT ALL PRIVILEGES ON $db_name.* TO "$db_user"@"%"
-            IDENTIFIED BY "db_password";
+            IDENTIFIED BY "$db_password";
             FLUSH PRIVILEGES;
             EXIT
             EOF
@@ -95,7 +99,7 @@ resources:
             $db_rootpassword: {get_attr: [database_root_password, value]}
             $db_name: {get_param: database_name}
             $db_user: {get_param: database_user}
-            # $db_password: {get_attr: [database_password, value]}
+            $db_password: {get_attr: [database_password, value]}
  
             # notify heat that we are done here
             wc_notify --data-binary '{"status": "SUCCESS"}'
@@ -109,6 +113,6 @@ outputs:
   port:
     description: The network port of the MySQL instance.
     value: { get_resource: port }
-  #database_password:
-#     description: The MySQL database password.
- #   value: { get_attr: [database_password, value] }
+  database_password:
+    description: The MySQL database password.
+    value: { get_attr: [database_password, value] }
