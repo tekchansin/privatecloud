@@ -1,49 +1,35 @@
-heat_template_version: 2015-04-30
-description: AutoScaling Wordpress
+heat_template_version: 2013-05-23
+ 
+description: Template that installs a wordpress server and supporting MySQL database running on separate servers
+ 
 parameters:
   image:
     type: string
-    description: Image used for servers
-    default: CentOS-7-x86_64
-  key:
-    type: string
-    description: SSH key to connect to the servers
-    default: cloudkey1
+    label: Image name or ID
+    description: Image to be used for server. Please use an Ubuntu based image.
+    default: trusty-server-cloudimg-amd64
   flavor:
     type: string
-    description: flavor used by the web servers
-    constraints:
-      - allowed_values: [m1.small, m1.medium]
-  database_flavor:
+    label: Flavor
+    description: Type of instance (flavor) to be used on the compute instance.
+    default: m1.small
+  key:
     type: string
-    description: flavor used by the db server
-    constraints:
-      - allowed_values: [m1.small, m1.medium]
-  private_network:
-    type: string
-    description: Network used by the server
-    default:  71717835-9853-4157-9caf-170b5eba23c7
-  private_subnet:
-    type: string
-    description: subnet on which the load balancer will be located
-    default: private_network
-  database_name:
-    type: string
-    description: Name of the wordpress DB
-    default: wordpress
-  database_user:
-    type: string
-    description: Name of the wordpress user
-    default: wordpress
+    label: Key name
+    description: Name of key-pair to be installed on the compute instance.
+    default: my_key
   public_network:
     type: string
-    description: UUID of a Neutron external network
-    default: public_network
-    
+    label: Public network name or ID
+    description: Public network to attach server to.
+    default: public
+  private_network:
+    type: string
+    label: Public network name or ID
+    description: Public network to attach server to.
+    default: private_network
+ 
 resources:
-  database_password:
-    type: OS::Heat::RandomString
-    
   mysql:
     type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/mysql-env.yaml
     properties:
@@ -51,18 +37,28 @@ resources:
       flavor: { get_param: flavor }
       key: { get_param: key }
       private_network: { get_param: private_network }
-      database_name: {get_param: database_name}
-      database_user: {get_param: database_user}
-  
-
+      database_name: wordpress
+      database_user: wordpress_user
+ 
   wordpress:
     type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/wordpress-env.yaml
     properties:
       image: { get_param: image }
       flavor: { get_param: flavor }
       key: { get_param: key }
-      private_network: { get_attr: [network, name] }
+      private_network: { get_param: private_network }
       mysql_server: { get_attr: [mysql, ip] }
       database_name: wordpress
       database_user: wordpress_user
       database_password: { get_attr: [mysql, database_password] }
+
+  floating_ip:
+    type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/floatip-env.yaml
+    properties:
+      port: { get_attr: [wordpress, port] }
+      public_network: { get_param: public_network }
+
+outputs:
+  ip:
+    description: The public IP address to access Wordpress.
+    value: { get_attr: [floating_ip, ip] }

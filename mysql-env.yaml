@@ -7,7 +7,7 @@ parameters:
     type: string
     label: Image name or ID
     description: Image to be used for server. Please use an Ubuntu based image.
-    default: CentOS-7-x86_64
+    default: trusty-server-cloudimg-amd64
   flavor:
     type: string
     label: Flavor
@@ -17,12 +17,12 @@ parameters:
     type: string
     label: Key name
     description: Name of key-pair to be installed on the compute instance.
-    default: cloudkey1
+    default: my_key
   private_network:
     type: string
     label: Private network name or ID
     description: Network to attach server to.
-    default: private_network
+    default: private
   database_name:
     type: string
     label: Database name
@@ -80,38 +80,45 @@ resources:
       networks:
         - port: { get_resource: port }
       user_data_format: RAW
-       user_data:
+      user_data:
         str_replace:
-          template: |
-            #!/bin/bash -v
-            setenforce 0
-            cat << REPO > /etc/yum.repos.d/local.repo
-            [local]
-            name=local
-            baseurl=http://192.168.10.9/repos/wordpress
-            enabled=1
-            gpgcheck=0
-            REPO
-            yum -y install mariadb mariadb-server
-            systemctl enable mariadb.service
-            systemctl start mariadb.service
-            firewall-cmd --permanent --add-port=3306/tcp
-            firewall-cmd --reload
-            
-            mysqladmin -u root password $db_rootpassword
-            
-            cat << EOF | mysql -u root --password=$db_rootpassword
-            CREATE DATABASE $db_name;
-            GRANT ALL PRIVILEGES ON $db_name.* TO "$db_user"@"%"
-            IDENTIFIED BY "$db_password";
-            FLUSH PRIVILEGES;
-            EXIT
-            EOF
           params:
-            $db_rootpassword: {get_attr: [mysql_root_password, value]}
-            $db_name: {get_param: database_name}
-            $db_user: {get_param: database_user}
-            $db_password: {get_attr: [database_password, value]}
+            __mysql_root_password__: { get_attr: [mysql_root_password, value] }
+            __database_name__: { get_param: database_name }
+            __database_user__: { get_param: database_user }
+            __database_password__: { get_attr: [database_password, value] }
+            wc_notify: { get_attr: ['wait_handle', 'curl_cli'] }
+          template: |
+            #!/bin/bash
+
+            # install MySQL
+            apt-get update
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get install -y mysql-server
+ 
+            # configure MySQL root password
+            mysqladmin -u root password "__mysql_root_password__"
+ 
+            # listen on all network interfaces
+            sed -i "s/bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/my.cnf
+ 
+            # restart service
+            service mysql restart
+ 
+            # create wordpress database
+            mysql -u root --password="__mysql_root_password__" <<EOF
+            CREATE DATABASE __database_name__;
+            CREATE USER '__database_user__'@'localhost';
+            SET PASSWORD FOR '__database_user__'@'localhost'=PASSWORD("__database_password__");
+            GRANT ALL PRIVILEGES ON __database_name__.* TO '__database_user__'@'localhost' IDENTIFIED BY '__database_password__';
+            CREATE USER '__database_user__'@'%';
+            SET PASSWORD FOR '__database_user__'@'%'=PASSWORD("__database_password__");
+            GRANT ALL PRIVILEGES ON __database_name__.* TO '__database_user__'@'%' IDENTIFIED BY '__database_password__';
+            FLUSH PRIVILEGES;
+            EOF
+ 
+            # notify heat that we are done here
+            wc_notify --data-binary '{"status": "SUCCESS"}'
 
 outputs:
   name:
