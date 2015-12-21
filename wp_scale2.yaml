@@ -55,3 +55,14 @@ resources:
       database_user: {get_param: database_user}
   
 
+  wordpress:
+    type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/wordpress-env.yaml
+    properties:
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key: { get_param: key }
+      private_network: { get_attr: [network, name] }
+      mysql_server: { get_attr: [mysql, ip] }
+      database_name: wordpress
+      database_user: wordpress_user
+      database_password: { get_attr: [mysql, database_password] }
