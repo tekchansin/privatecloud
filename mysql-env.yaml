@@ -33,7 +33,7 @@ parameters:
     description: Name of the database user.
  
 resources:
-  database_password:
+  database_password1:
     type: OS::Heat::RandomString
   database_root_password:
     type: OS::Heat::RandomString     
@@ -42,10 +42,10 @@ resources:
     properties:
       security_groups: 
         - db_security_group
-      flavor: {get_param: database_flavor}
+      flavor: {get_param: flavor}
       image: {get_param: image}
       key_name: {get_param: key}
-      networks: [{network: {get_param: network} }]
+      networks: [{network: {get_param: private_network} }]
       user_data_format: RAW
       user_data:
         str_replace:
@@ -78,7 +78,7 @@ resources:
             $db_rootpassword: {get_attr: [database_root_password, value]}
             $db_name: {get_param: database_name}
             $db_user: {get_param: database_user}
-            $db_password: {get_attr: [database_password, value]}
+            $db_password: {get_attr: [database_password1, value]}
 outputs:
   name:
     description: Name of the MySQL instance.
