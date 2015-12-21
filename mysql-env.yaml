@@ -87,7 +87,7 @@ resources:
             cat << EOF | mysql -u root --password=$db_rootpassword
             CREATE DATABASE $db_name;
             GRANT ALL PRIVILEGES ON $db_name.* TO "$db_user"@"%"
-            IDENTIFIED BY "$db_password";
+            IDENTIFIED BY "db_password";
             FLUSH PRIVILEGES;
             EXIT
             EOF
@@ -95,7 +95,7 @@ resources:
             $db_rootpassword: {get_attr: [database_root_password, value]}
             $db_name: {get_param: database_name}
             $db_user: {get_param: database_user}
-            $db_password: 111111
+            # $db_password: {get_attr: [database_password, value]}
  
             # notify heat that we are done here
             wc_notify --data-binary '{"status": "SUCCESS"}'
