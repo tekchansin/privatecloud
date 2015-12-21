@@ -22,11 +22,11 @@ parameters:
   network:
     type: string
     description: Network used by the server
-    default: 6a328376-be26-4be6-a511-110ca0abf35a
+    default:  647fc0f1-874f-4781-8c79-99bbedf53214
   subnet_id:
     type: string
     description: subnet on which the load balancer will be located
-    default: 4721b82d-b004-45ad-aca8-265f162b7d53
+    default: 30228662-7fb3-4d47-93f0-acd7d72fe279
   database_name:
     type: string
     description: Name of the wordpress DB
@@ -63,7 +63,7 @@ resources:
             cat << REPO > /etc/yum.repos.d/local.repo
             [local]
             name=local
-            baseurl=http://192.168.10.3/repos/wordpress
+            baseurl=http://192.168.10.7/repos/wordpress
             enabled=1
             gpgcheck=0
             REPO
@@ -110,7 +110,7 @@ resources:
                 cat << REPO > /etc/yum.repos.d/local.repo
                 [local]
                 name=local
-                baseurl=http://192.168.10.3/repos/wordpress
+                baseurl=http://192.168.10.7/repos/wordpress
                 enabled=1
                 gpgcheck=0
                 REPO
@@ -121,11 +121,24 @@ resources:
 
                 sed -i "/Deny from All/d" /etc/httpd/conf.d/wordpress.conf
                 sed -i "s/Require local/Require all granted/" /etc/httpd/conf.d/wordpress.conf
+                sed -i "s/AllowOverride Options/AllowOverride All/" /etc/httpd/conf.d/wordpress.conf
                 sed -i s/database_name_here/$db_name/ /etc/wordpress/wp-config.php
                 sed -i s/username_here/$db_user/ /etc/wordpress/wp-config.php
                 sed -i s/password_here/$db_password/ /etc/wordpress/wp-config.php
                 sed -i s/localhost/$db_host/ /etc/wordpress/wp-config.php
        
+                cat << HTACCESS > /usr/share/wordpress/.htaccess
+                <IfModule mod_rewrite.c>
+                RewriteEngine On
+                RewriteBase /wordpress/
+                RewriteRule ^index\.php$ - [L]
+                RewriteCond %{REQUEST_FILENAME} !-f
+                RewriteCond %{REQUEST_FILENAME} !-d
+                RewriteRule . /wordpress/index.php [L]
+                </IfModule>
+                HTACCESS
+                chmod 644 /usr/share/wordpress/.htaccess
+
                 systemctl restart httpd.service
                 firewall-cmd --permanent --add-port=80/tcp
                 firewall-cmd --reload

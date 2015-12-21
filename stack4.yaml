@@ -16,11 +16,11 @@ parameters:
   network:
     type: string
     description: Network used by the server
-    default: 2e526792-10f2-43e4-aab5-8f3912571e76
+    default: 647fc0f1-874f-4781-8c79-99bbedf53214 
   subnet_id:
     type: string
     description: subnet on which the load balancer will be located
-    default: 7bae7b87-4e7c-4e8e-be6f-6b5ea112bbdd
+    default: 30228662-7fb3-4d47-93f0-acd7d72fe279
   external_network_id:
     type: string
     description: UUID of a Neutron external network
@@ -46,7 +46,7 @@ resources:
     type: OS::Heat::AutoScalingGroup
     properties:
       min_size: 1
-      max_size: 20
+      max_size: 5
       cooldown: 60
       desired_capacity: 1
       resource:
@@ -108,10 +108,10 @@ resources:
   cpu_alarm_low:
     type: OS::Ceilometer::Alarm
     properties:
-      description: Scale-down if the average CPU < 15% for 60 minutes
+      description: Scale-down if the average CPU < 15% for 1 minutes
       meter_name: cpu_util
       statistic: avg
-      period: 600
+      period: 60
       evaluation_periods: 1
       threshold: 15
       alarm_actions:

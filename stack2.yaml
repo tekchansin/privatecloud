@@ -66,11 +66,11 @@ parameters:
   private_net_id:
     type: string
     description: ID of private network into which servers get deployed
-    default: 07f908e4-8321-4d74-a2ed-5088f19c8bd6
+    default: 7e32821a-4f6e-45f0-a148-db918edec44e
   private_subnet_id:
     type: string
     description: ID of private sub network into which servers get deployed
-    default: e75af332-c726-420b-9c35-a69dc6b202ad
+    default: 63bca06b-eb52-45f1-80a1-3559b8ca50fd
   key_name:
     type: string
     label: Key name

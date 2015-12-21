@@ -68,14 +68,15 @@ resources:
         runcmd:
           - yum update -y
           - rpm -ivh https://dl.fedoraproject.org/pub/epel/6Server/x86_64/stress-1.0.4-4.el6.x86_64.rpm
-          - stress --cpu 1 --timeout 5m
+          - stress --cpu 1 --timeout 3m
           
   asg:
     type: OS::Heat::AutoScalingGroup
     depends_on: private_subnet
     properties:
+      cooldown: 60
       min_size: 1
-      max_size: 10
+      max_size: 5
       resource:
         type: OS::Nova::Server
         properties:
