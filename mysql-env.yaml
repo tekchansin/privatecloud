@@ -33,44 +33,18 @@ parameters:
     description: Name of the database user.
  
 resources:
-  wait_condition:
-    type: OS::Heat::WaitCondition
-    properties:
-      handle: { get_resource: wait_handle }
-      count: 1
-      timeout: 600
- 
-  wait_handle:
-    type: OS::Heat::WaitConditionHandle
- 
-  mysql_root_password:
+  database_root_password:
     type: OS::Heat::RandomString
-    properties:
-      length: 32
-      sequence: lettersdigits
- 
+
   database_password:
     type: OS::Heat::RandomString
-    properties:
-      length: 32
-      sequence: lettersdigits
- 
-  security_group:
-    type: OS::Neutron::SecurityGroup
-    properties:
-      name: db_server_security_group
-      rules:
-        - protocol: tcp
-          port_range_min: 3306
-          port_range_max: 3306
- 
+
   port:
     type: OS::Neutron::Port
     properties:
       network: { get_param: private_network }
       security_groups:
-        - { get_resource: security_group }
-      
+        - { get_resource: db_security_group }     
   mysql_instance:
     type: OS::Nova::Server
     properties:
