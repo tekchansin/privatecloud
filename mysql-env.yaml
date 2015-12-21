@@ -31,10 +31,6 @@ parameters:
     type: string
     label: Database username
     description: Name of the database user.
-  database_password:
-    type: string
-    label: Database username
-    description: Name of the database user.
  
 resources:
   database_root_password:
