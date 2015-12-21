@@ -53,7 +53,6 @@ resources:
       private_network: { get_param: private_network }
       database_name: {get_param: database_name}
       database_user: {get_param: database_user}
-      database_password: {get_attr: [database_password, value]}
   asg:
     type: OS::Heat::AutoScalingGroup
     properties:
