@@ -36,7 +36,7 @@ resources:
   database_root_password:
     type: OS::Heat::RandomString
 
-  database_password:
+  database_passwordaa:
     type: OS::Heat::RandomString
 
   port:
@@ -109,6 +109,6 @@ outputs:
   port:
     description: The network port of the MySQL instance.
     value: { get_resource: port }
-  database_password:
-    description: The MySQL database password.
-    value: { get_attr: [database_password, value] }
+  #database_password:
+#     description: The MySQL database password.
+ #   value: { get_attr: [database_password, value] }
