@@ -1,0 +1,140 @@
+heat_template_version: 2013-05-23
+ 
+description: Template that installs a MySQL server with a database.
+ 
+parameters:
+  image:
+    type: string
+    label: Image name or ID
+    description: Image to be used for server. Please use an Ubuntu based image.
+    default: trusty-server-cloudimg-amd64
+  flavor:
+    type: string
+    label: Flavor
+    description: Type of instance (flavor) to be used on the compute instance.
+    default: m1.small
+  key:
+    type: string
+    label: Key name
+    description: Name of key-pair to be installed on the compute instance.
+    default: my_key
+  private_network:
+    type: string
+    label: Private network name or ID
+    description: Network to attach server to.
+    default: private
+  database_name:
+    type: string
+    label: Database name
+    description: Name of the application database.
+  database_user:
+    type: string
+    label: Database username
+    description: Name of the database user.
+ 
+resources:
+  wait_condition:
+    type: OS::Heat::WaitCondition
+    properties:
+      handle: { get_resource: wait_handle }
+      count: 1
+      timeout: 600
+ 
+  wait_handle:
+    type: OS::Heat::WaitConditionHandle
+ 
+  mysql_root_password:
+    type: OS::Heat::RandomString
+    properties:
+      length: 32
+      sequence: lettersdigits
+ 
+  database_password:
+    type: OS::Heat::RandomString
+    properties:
+      length: 32
+      sequence: lettersdigits
+ 
+  security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: db_server_security_group
+      rules:
+        - protocol: tcp
+          port_range_min: 3306
+          port_range_max: 3306
+ 
+  port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_param: private_network }
+      security_groups:
+        - { get_resource: security_group }
+      
+  mysql_instance:
+    type: OS::Nova::Server
+    properties:
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key }
+      networks:
+        - port: { get_resource: port }
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash
+            # install MySQL
+            setenforce 0
+            cat << REPO > /etc/yum.repos.d/local.repo
+            [local]
+            name=local
+            baseurl=http://192.168.10.9/repos/wordpress
+            enabled=1
+            gpgcheck=0
+            REPO
+            yum -y install mariadb mariadb-server
+
+ 
+            # configure MySQL root password
+            mysqladmin -u root password $db_rootpassword
+ 
+            # listen on all network interfaces
+            sed -i "s/bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/my.cnf
+ 
+            # restart service
+
+            systemctl enable mariadb.service
+            systemctl start mariadb.service
+            firewall-cmd --permanent --add-port=3306/tcp
+            firewall-cmd --reload
+ 
+            # create wordpress database
+            cat << EOF | mysql -u root --password=$db_rootpassword
+            CREATE DATABASE $db_name;
+            GRANT ALL PRIVILEGES ON $db_name.* TO "$db_user"@"%"
+            IDENTIFIED BY "$db_password";
+            FLUSH PRIVILEGES;
+            EXIT
+            EOF
+          params:
+            $db_rootpassword: {get_attr: [database_root_password, value]}
+            $db_name: {get_param: database_name}
+            $db_user: {get_param: database_user}
+            $db_password: {get_attr: [database_password, value]}
+ 
+            # notify heat that we are done here
+            wc_notify --data-binary '{"status": "SUCCESS"}'
+outputs:
+  name:
+    description: Name of the MySQL instance.
+    value: { get_attr: [mysql_instance, name] }
+  ip:
+    description: The IP address of the MySQL instance.
+    value: { get_attr: [mysql_instance, first_address] }
+  port:
+    description: The network port of the MySQL instance.
+    value: { get_resource: port }
+  database_password:
+    description: The MySQL database password.
+    value: { get_attr: [database_password, value] }
