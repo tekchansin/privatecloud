@@ -6,7 +6,7 @@ parameters:
   image:
     type: string
     label: Image name or ID
-    description: Image to be used for server. Please use an Ubuntu based image.
+    description: Image to be used for server CenOSBase.
     default: CentOS-7-x86_64
   flavor:
     type: string
