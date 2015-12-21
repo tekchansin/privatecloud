@@ -1,4 +1,4 @@
-heat_template_version: 2013-05-23
+heat_template_version: 2015-04-30
  
 description: Template that installs a MySQL server with a database.
  
@@ -35,28 +35,20 @@ parameters:
 resources:
   database_root_password:
     type: OS::Heat::RandomString
-    properties:
-      length: 32
-      sequence: lettersdigits
+
   database_password:
     type: OS::Heat::RandomString
     properties:
-      length: 32
-      sequence: lettersdigits
-  port:
-    type: OS::Neutron::Port
-    properties:
-      network: { get_param: private_network }
-      security_groups:
-        - { get_resource: db_security_group }     
+    
   mysql_instance:
     type: OS::Nova::Server
     properties:
+      security_groups: 
+        - db_security_group
       image: { get_param: image }
       flavor: { get_param: flavor }
       key_name: { get_param: key }
-      networks:
-        - port: { get_resource: port }
+      networks: [{network: {get_param: network} }]
       user_data_format: RAW
       user_data:
         str_replace:
