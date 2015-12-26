@@ -1,0 +1,324 @@
+heat_template_version: 2015-04-30
+description: AutoScaling Wordpress
+parameters:
+  image:
+    type: string
+    description: Image used for servers
+    default: CentOS-7-x86_64
+  key:
+    type: string
+    description: SSH key to connect to the servers
+    default: cloudkey1
+  flavor:
+    type: string
+    description: flavor used by the web servers
+    constraints:
+      - allowed_values: [m1.small, m1.medium]
+  database_flavor:
+    type: string
+    description: flavor used by the db server
+    constraints:
+      - allowed_values: [m1.small, m1.medium]
+  network:
+    type: string
+    description: Network used by the server
+    default:  71717835-9853-4157-9caf-170b5eba23c7
+  subnet_id:
+    type: string
+    description: subnet on which the load balancer will be located
+    default: 51de5081-dd0a-47fe-a23a-29704dc53e18
+  database_name:
+    type: string
+    description: Name of the wordpress DB
+    default: wordpress
+  database_user:
+    type: string
+    description: Name of the wordpress user
+    default: wordpress
+  public_network:
+    type: string
+    description: UUID of a Neutron external network
+    default: eab1f09e-cbe8-439d-87d8-a11dd27050f1
+    
+resources:
+  database_password:
+    type: OS::Heat::RandomString
+  database_root_password:
+    type: OS::Heat::RandomString     
+  db:
+    type: OS::Nova::Server
+    properties:
+      security_groups: 
+        - db_security_group
+      flavor: {get_param: database_flavor}
+      image: {get_param: image}
+      key_name: {get_param: key}
+      networks: [{network: {get_param: network} }]
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash -v
+            setenforce 0
+            cat << REPO > /etc/yum.repos.d/local.repo
+            [local]
+            name=local
+            baseurl=http://192.168.10.66/repos/wordpress
+            enabled=1
+            gpgcheck=0
+            REPO
+            yum -y install mariadb mariadb-server
+            systemctl enable mariadb.service
+            systemctl start mariadb.service
+            firewall-cmd --permanent --add-port=3306/tcp
+            firewall-cmd --reload
+            
+            mysqladmin -u root password $db_rootpassword
+            
+            cat << EOF | mysql -u root --password=$db_rootpassword
+            CREATE DATABASE $db_name;
+            GRANT ALL PRIVILEGES ON $db_name.* TO "$db_user"@"%"
+            IDENTIFIED BY "$db_password";
+            FLUSH PRIVILEGES;
+            EXIT
+            EOF
+          params:
+            $db_rootpassword: {get_attr: [database_root_password, value]}
+            $db_name: {get_param: database_name}
+            $db_user: {get_param: database_user}
+            $db_password: {get_attr: [database_password, value]}
+  asg:
+    type: OS::Heat::AutoScalingGroup
+    properties:
+      min_size: 1
+      max_size: 5
+      resource:
+        type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/lb-wpenv.yaml
+        properties:
+          flavor: {get_param: flavor}
+          image: {get_param: image}
+          key_name: {get_param: key}
+          network: {get_param: network}
+          pool_id: {get_resource: pool}
+          metadata: {"metering.stack": {get_param: "OS::stack_id"}}
+          user_data:
+            str_replace:
+              template: |
+                #!/bin/bash -v
+                setenforce 0
+                cat << REPO > /etc/yum.repos.d/local.repo
+                [local]
+                name=local
+                baseurl=http://192.168.10.66/repos/wordpress
+                enabled=1
+                gpgcheck=0
+                REPO
+                setsebool -P httpd_can_network_connect_db=1
+                yum -y install php php-gd php-mysql httpd wget tmux vim unzip
+                systemctl enable httpd.service
+                systemctl start httpd.service
+                
+                # download wordpress
+                cd /root
+                wget http://wordpress.org/latest.tar.gz
+                rm /var/www/html/index.html
+                tar -xzf latest.tar.gz 
+                
+                cp wordpress/wp-config-sample.php wordpress/wp-config.php
+                sed -i 's/database_name_here/$db_name/' wordpress/wp-config.php
+                sed -i 's/username_here/$db_user/' wordpress/wp-config.php
+                sed -i 's/password_here/$db_password/' wordpress/wp-config.php
+                sed -i 's/localhost/$db_host/' wordpress/wp-config.php
+                
+                cp -avR wordpress/* /var/www/html/
+
+                mkdir /var/www/html/wp-content/uploads
+                
+                firewall-cmd --permanent --add-port=80/tcp
+                firewall-cmd --reload
+                
+                yum -y install epel-release
+                yum -y install nodejs npm vim tmux git
+                yum -y install golang
+                mkdir /root/gopath
+                export GOPATH="/root/gopath/"
+                go get github.com/ncw/rclone
+                sleep 5
+                cp /root/gopath/bin/rclone /usr/bin
+                npm install fsmonitor
+                npm install -g fsmonitor
+                npm install forever
+                npm install -g forever
+
+                cat << RCLONE > /root/.rclone.conf
+                [remote]
+                type = swift
+                user = demo
+                key = isyl]y[openstack
+                auth = http://103.27.200.234:5000/v2.0
+                tenant = demo
+                region = RegionOne
+                RCLONE
+                
+                
+                rclone mkdir remote:uploads
+                rclone mkdir remote:themes
+                rclone sync  remote:uploads  /var/www/html/wp-content/uploads
+                rclone sync  remote:themes  /var/www/html/wp-content/themes
+                
+                cat << BACKUP > backup.js
+                var sys = require('sys');
+                var exec = require('child_process').exec;
+                function reports(error, stdout, stderr) {sys.puts(stdout)};
+                fsmonitor = require('fsmonitor');
+                fsmonitor.watch('/var/www/html/wp-content/uploads', null, function(change) {
+                console.log("Change detected:\n" + change);  
+
+                console.log("Added files:    %j", change.addedFiles);
+                console.log("Modified files: %j", change.modifiedFiles);
+                console.log("Removed files:  %j", change.removedFiles);
+
+                console.log("Added folders:    %j", change.addedFolders);
+                console.log("Modified folders: %j", change.modifiedFolders);
+                console.log("Removed folders:  %j", change.removedFolders);
+                exec('rclone sync /var/www/html/wp-content/uploads  remote:uploads',reports)
+                });
+                
+                fsmonitor2 = require('fsmonitor');
+                fsmonitor2.watch('/var/www/html/wp-content/themes', null, function(change) {
+                console.log("Change detected:\n" + change);  
+
+                console.log("Added files:    %j", change.addedFiles);
+                console.log("Modified files: %j", change.modifiedFiles);
+                console.log("Removed files:  %j", change.removedFiles);
+
+                console.log("Added folders:    %j", change.addedFolders);
+                console.log("Modified folders: %j", change.modifiedFolders);
+                console.log("Removed folders:  %j", change.removedFolders);
+                exec('rclone sync /var/www/html/wp-content/themes  remote:themes', reports)
+                });
+                BACKUP
+                forever start backup.js
+              params:
+                $db_name: {get_param: database_name}
+                $db_user: {get_param: database_user}
+                $db_password: {get_attr: [database_password, value]}
+                $db_host: {get_attr: [db, first_address]}
+                
+  web_server_scaleup_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: asg}
+      cooldown: 60
+      scaling_adjustment: 1
+      
+  web_server_scaledown_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: asg}
+      cooldown: 60
+      scaling_adjustment: -1
+      
+  cpu_alarm_high:
+    type: OS::Ceilometer::Alarm
+    properties:
+      description: Scale-up if the average CPU > 50% for 1 minute
+      meter_name: cpu_util
+      statistic: avg
+      period: 60
+      evaluation_periods: 1
+      threshold: 50
+      alarm_actions:
+        - {get_attr: [web_server_scaleup_policy, alarm_url]}
+      matching_metadata: {'metadata.user_metadata.stack': {get_param: "OS::stack_id"}}
+      comparison_operator: gt
+  cpu_alarm_low:
+    type: OS::Ceilometer::Alarm
+    properties:
+      description: Scale-down if the average CPU < 15% for 10 minutes
+      meter_name: cpu_util
+      statistic: avg
+      period: 60
+      evaluation_periods: 1
+      threshold: 15
+      alarm_actions:
+        - {get_attr: [web_server_scaledown_policy, alarm_url]}
+      matching_metadata: {'metadata.user_metadata.stack': {get_param: "OS::stack_id"}}
+      comparison_operator: lt
+  monitor:
+    type: OS::Neutron::HealthMonitor
+    properties:
+      type: TCP
+      delay: 5
+      max_retries: 5
+      timeout: 5
+  pool:
+    type: OS::Neutron::Pool
+    properties:
+      protocol: HTTP
+      monitors: [{get_resource: monitor}]
+      subnet_id: {get_param: subnet_id}
+      lb_method: ROUND_ROBIN
+      vip:
+        protocol_port: 80
+  lb:
+    type: OS::Neutron::LoadBalancer
+    properties:
+      protocol_port: 80
+      pool_id: {get_resource: pool}
+
+  # assign a floating ip address to the load balancer
+  # pool.
+  lb_floating:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: {get_param: public_network}
+      port_id: {get_attr: [pool, vip, port_id]}
+
+outputs:
+  scale_up_url:
+    description: >
+      This URL is the webhook to scale up the autoscaling group.  You
+      can invoke the scale-up operation by doing an HTTP POST to this
+      URL; no body nor extra headers are needed.
+    value: {get_attr: [web_server_scaleup_policy, alarm_url]}
+  scale_dn_url:
+    description: >
+      This URL is the webhook to scale down the autoscaling group.
+      You can invoke the scale-down operation by doing an HTTP POST to
+      this URL; no body nor extra headers are needed.
+    value: {get_attr: [web_server_scaledown_policy, alarm_url]}
+  pool_ip_address:
+    value: {get_attr: [pool, vip, address]}
+    description: The IP address of the load balancing pool
+  website_url:
+    value:
+      str_replace:
+        template: http://host/
+        params:
+          host: { get_attr: [lb_floating, floating_ip_address] }
+    description: >
+      This URL is the "external" URL that can be used to access the
+      Wordpress site.
+  ceilometer_query:
+    value:
+      str_replace:
+        template: >
+          ceilometer statistics -m cpu_util
+          -q metadata.user_metadata.stack=stackval -p 60 -a avg
+        params:
+          stackval: { get_param: "OS::stack_id" }
+    description: >
+      This is a Ceilometer query for statistics on the cpu_util meter
+      Samples about OS::Nova::Server instances in this stack.  The -q
+      parameter selects Samples according to the subject's metadata.
+      When a VM's metadata includes an item of the form metering.X=Y,
+      the corresponding Ceilometer resource has a metadata item of the
+      form user_metadata.X=Y and samples about resources so tagged can
+      be queried with a Ceilometer query term of the form
+      metadata.user_metadata.X=Y.  In this case the nested stacks give
+      their VMs metadata that is passed as a nested stack parameter,
+      and this stack passes a metadata of the form metering.stack=Y,
+      where Y is this stack's ID.

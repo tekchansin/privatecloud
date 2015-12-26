@@ -1,0 +1,136 @@
+heat_template_version: 2015-04-30
+description: AutoScaling Wordpress
+parameters:
+  image:
+    type: string
+    description: Image used for servers
+    default: CentOS-7-x86_64
+  key:
+    type: string
+    description: SSH key to connect to the servers
+    default: cloudkey1
+  flavor:
+    type: string
+    description: flavor used by the web servers
+    constraints:
+      - allowed_values: [m1.small, m1.medium]
+  database_flavor:
+    type: string
+    description: flavor used by the db server
+    constraints:
+      - allowed_values: [m1.small, m1.medium]
+  network:
+    type: string
+    description: Network used by the server
+    default:  71717835-9853-4157-9caf-170b5eba23c7
+  subnet_id:
+    type: string
+    description: subnet on which the load balancer will be located
+    default: 51de5081-dd0a-47fe-a23a-29704dc53e18
+  database_name:
+    type: string
+    description: Name of the wordpress DB
+    default: wordpress
+  database_user:
+    type: string
+    description: Name of the wordpress user
+    default: wordpress
+  public_network:
+    type: string
+    description: UUID of a Neutron external network
+    default: eab1f09e-cbe8-439d-87d8-a11dd27050f1
+  shared_ip:
+   type: string
+   description: Fixed ip of the extra port which will be used by keepalived.
+   default: 10.0.0.2
+   
+resources:
+  database_password:
+    type: OS::Heat::RandomString
+  database_root_password:
+    type: OS::Heat::RandomString     
+  db:
+    type: OS::Nova::Server
+    properties:
+      security_groups: 
+        - db_security_group
+      flavor: {get_param: database_flavor}
+      image: {get_param: image}
+      key_name: {get_param: key}
+      networks: [{network: {get_param: network} }]
+      user_data_format: RAW
+      user_data:
+        str_replace:
+            template: |
+                #!/bin/bash -v
+                yum install keepalived -y
+                rm -rf /etc/keepalived/keepalived.conf
+                echo '
+                vrrp_instance vrrp_group_1 {
+                    state MASTER
+                    interface eth0
+                    virtual_router_id 1
+                    priority 100
+                    authentication {
+                        auth_type PASS
+                        auth_pass password
+                    }
+                    virtual_ipaddress {
+                        $shared_ip/24 brd 10.0.0.255 dev eth0
+                    }
+                } ' >> /etc/keepalived/keepalived.conf
+                service keepalived restart
+       
+                #Install and configure haproxy
+                yum install haproxy -y
+                rm -rf /etc/haproxy/haproxy.cfg
+                echo '
+                global
+                    log 127.0.0.1 local0 debug
+                    maxconn   45000 # Total Max Connections. This is dependent on ulimit
+                    user haproxy
+                    group haproxy
+                    daemon
+
+                defaults
+                    log global
+                    mode http
+                    option dontlognull
+                    retries 3
+                    option redispatch
+                    timeout server 86400000
+                    timeout connect 86400000
+                    timeout client 86400000
+                    timeout queue   1000s
+
+                listen  http_web 0.0.0.0:80
+                    mode http
+                    stats enable
+                    stats uri /haproxy?stats
+                    option httpclose
+                    option forwardfor
+                    balance roundrobin # Load Balancing algorithm
+                    reqadd X-Forwarded-Proto:\ http
+                    server Alice 192.168.122.111 check
+                    server Bob 192.168.122.112 check
+
+                listen  stats   $shared_ip:1936
+                    mode    http
+                    log     global
+                    maxconn     10
+                    clitimeout      100s
+                    srvtimeout      100s
+                    contimeout      100s
+                    timeout queue   100s
+                    stats enable
+                    stats hide-version
+                    stats refresh 30s
+                    stats show-node
+                    stats auth admin:password
+                    stats uri  /haproxy?stats ' >> /etc/haproxy/haproxy.cfg
+
+                service haproxy restart
+                echo 'http://$host/' >> /root/host_url.txt
+            params:
+                $shared_ip: { get_param: shared_ip }
+                $host: { get_attr: [ extra_floating_ip, floating_ip_address ] }

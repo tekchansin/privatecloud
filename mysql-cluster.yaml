@@ -1,0 +1,112 @@
+heat_template_version: 2015-04-30
+description: AutoScaling Wordpress
+parameters:
+  image:
+    type: string
+    description: Image used for servers
+    default: CentOS-7-x86_64
+  key:
+    type: string
+    description: SSH key to connect to the servers
+    default: cloudkey1
+  flavor:
+    type: string
+    description: flavor used by the web servers
+    constraints:
+      - allowed_values: [m1.small, m1.medium]
+  database_flavor:
+    type: string
+    description: flavor used by the db server
+    constraints:
+      - allowed_values: [m1.small, m1.medium]
+  network:
+    type: string
+    description: Network used by the server
+    default:  5116d220-858f-4ec2-a735-37f2855fa3d9
+  subnet_id:
+    type: string
+    description: subnet on which the load balancer will be located
+    default: b0e17783-56e3-40c9-84f6-d2b1d2b69f15
+  database_name:
+    type: string
+    description: Name of the wordpress DB
+    default: wordpress
+  database_user:
+    type: string
+    description: Name of the wordpress user
+    default: wordpress
+  public_network:
+    type: string
+    description: UUID of a Neutron external network
+    default: eab1f09e-cbe8-439d-87d8-a11dd27050f1
+    
+
+resources:   
+  mysql_cluster:
+    type: OS::Heat::CloudConfig
+    properties:
+      cloud_config:
+        runcmd:
+          - yum update -y
+
+  dbserver1:
+    type: OS::Nova::Server
+    properties:
+      key_name: { get_param: key }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      networks: [{ network: { get_param: network } }]
+      user_data: 
+        get_resource: mysql_cluster
+      user_data_format: RAW
+
+  dbserver2:
+    type: OS::Nova::Server
+    properties:
+      key_name: { get_param: key }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      networks: [{ network: { get_param: network } }]
+      user_data: 
+            get_resource: mysql_cluster
+      user_data_format: RAW
+    
+  dbserver3:
+    type: OS::Nova::Server
+    properties:
+      key_name: { get_param: key }
+      flavor: { get_param: flavor }
+      image: { get_param: image }
+      networks: [{ network: { get_param: network } }]
+      user_data: 
+            get_resource: mysql_cluster
+      user_data_format: RAW
+  monitor:
+    type: OS::Neutron::HealthMonitor
+    properties:
+      type: TCP
+      delay: 5
+      max_retries: 5
+      timeout: 5
+
+  lb_pool:
+    type: OS::Neutron::Pool
+    properties:
+      protocol: HTTP
+      monitors: [{get_resource: monitor}]
+      subnet_id: {get_param: subnet_id}
+      lb_method: ROUND_ROBIN
+      vip:
+        protocol_port: 3306
+
+  lb_members:
+    type: OS::Neutron::LoadBalancer
+    properties:
+        pool_id: { get_resource: lb_pool }
+        members: [ { get_resource: dbserver1 }, { get_resource: dbserver2 }, { get_resource: dbserver3 } ]
+        protocol_port: 3306
+
+outputs:
+    vip_ip:
+      description: IP of VIP
+      value: { get_attr: [ lb_pool, vip, address ] }

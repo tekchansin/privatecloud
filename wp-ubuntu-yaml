@@ -17,12 +17,12 @@ parameters:
     type: string
     label: Key name
     description: Name of key-pair to be installed on the compute instance.
-    default: my_key
+    default: cloudkey1
   public_network:
     type: string
     label: Public network name or ID
     description: Public network to attach server to.
-    default: public
+    default: public_network
   private_network:
     type: string
     label: Public network name or ID
@@ -31,7 +31,7 @@ parameters:
  
 resources:
   mysql:
-    type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/mysql-env.yaml
+    type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/mysql-ubuntu-env.yaml
     properties:
       image: { get_param: image }
       flavor: { get_param: flavor }
@@ -41,7 +41,7 @@ resources:
       database_user: wordpress_user
  
   wordpress:
-    type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/wordpress-env.yaml
+    type: https://raw.githubusercontent.com/thaiopen/privatecloud/master/wordpress-ubuntu-env.yaml
     properties:
       image: { get_param: image }
       flavor: { get_param: flavor }
