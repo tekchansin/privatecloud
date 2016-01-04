@@ -22,11 +22,11 @@ parameters:
   network:
     type: string
     description: Network used by the server
-    default:  71717835-9853-4157-9caf-170b5eba23c7
+    default:  private_network
   subnet_id:
     type: string
     description: subnet on which the load balancer will be located
-    default: 51de5081-dd0a-47fe-a23a-29704dc53e18
+    default: private_subnet
   database_name:
     type: string
     description: Name of the wordpress DB
@@ -38,7 +38,7 @@ parameters:
   public_network:
     type: string
     description: UUID of a Neutron external network
-    default: eab1f09e-cbe8-439d-87d8-a11dd27050f1
+    default: public_network
     
 resources:
   database_password:
@@ -60,13 +60,6 @@ resources:
           template: |
             #!/bin/bash -v
             setenforce 0
-            cat << REPO > /etc/yum.repos.d/local.repo
-            [local]
-            name=local
-            baseurl=http://192.168.10.66/repos/wordpress
-            enabled=1
-            gpgcheck=0
-            REPO
             yum -y install mariadb mariadb-server
             systemctl enable mariadb.service
             systemctl start mariadb.service
@@ -106,13 +99,7 @@ resources:
               template: |
                 #!/bin/bash -v
                 setenforce 0
-                cat << REPO > /etc/yum.repos.d/local.repo
-                [local]
-                name=local
-                baseurl=http://192.168.10.66/repos/wordpress
-                enabled=1
-                gpgcheck=0
-                REPO
+                
                 setsebool -P httpd_can_network_connect_db=1
                 yum -y install php php-gd php-mysql httpd wget tmux vim unzip
                 systemctl enable httpd.service

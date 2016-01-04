@@ -1,0 +1,71 @@
+heat_template_version: 2013-05-23
+description: A load-balancer server
+parameters:
+  image:
+    type: string
+    description: Image used for servers
+  key_name:
+    type: string
+    description: SSH key to connect to the servers
+  flavor:
+    type: string
+    description: flavor used by the servers
+  pool_id:
+    type: string
+    description: Pool to contact
+  db_host:
+    type: string
+  db_name:
+    type: string
+  db_user:
+    type: string
+  db_password:
+    type: string
+  network:
+    type: string
+  metadata:
+    type: json
+
+resources:
+  web-server:
+    type: OS::Nova::Server
+    properties:
+      flavor: {get_param: flavor}
+      image: {get_param: image}
+      key_name: {get_param: key_name}
+      metadata: {get_param: metadata}
+      networks:
+        - network: {get_param: network}
+      user_data_format: SOFTWARE_CONFIG
+
+  web-config:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      inputs:
+        - name: db_host
+        - name: db_name
+        - name: db_user
+        - name: db_password
+      group: script
+      config:
+        get_file: web.sh
+
+  web-deployment:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      config:
+        get_resource: web-config
+      server:
+        get_resource: web-server
+      input_values:
+        db_host: { get_param: db_host }
+        db_name: { get_param: db_name }
+        db_user: { get_param: db_user }
+        db_password: { get_param: db_password }
+
+  member:
+    type: OS::Neutron::PoolMember
+    properties:
+      pool_id: {get_param: pool_id}
+      address: {get_attr: [web-server, first_address]}
+      protocol_port: 80

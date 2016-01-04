@@ -1,0 +1,271 @@
+heat_template_version: 2013-05-23
+description: AutoScaling Wordpress
+parameters:
+  web-image:
+    type: string
+    description: Image used for web servers
+    default: CentOS-7-x86_64-heat
+  db-image:
+    type: string
+    description: Image used for db servers
+    default: CentOS-7-x86_64-heat
+  key:
+    type: string
+    description: SSH key to connect to the servers
+    default: cloudkey1
+  web-flavor:
+    type: string
+    description: flavor used by the web servers
+    default: m1.small
+  db-flavor:
+    type: string
+    description: flavor used by the db server
+    default: m1.small
+  subnet_id:
+    type: string
+    description: subnet on which the load balancer will be located
+    default: private_subnet
+  network:
+    type: string
+    description: subnet on which the load balancer will be located
+    default: private_network
+  external:
+    type: string
+    description: subnet on which the load balancer will be located
+    default: public_network
+  db_name:
+    type: string
+    description: Name of the wordpress DB
+    default: wordpress
+  db_user:
+    type: string
+    description: Name of the wordpress user
+    default: wordpress
+#  db_root_password:
+#    type: string
+#    default: Passw0rd
+  db_password:
+    type: string
+    default: Passw0rd
+
+resources:
+
+  web-monitor:
+    type: OS::Neutron::HealthMonitor
+    properties:
+      type: TCP
+      delay: 5
+      max_retries: 5
+      timeout: 5
+  web-pool:
+    type: OS::Neutron::Pool
+    properties:
+      protocol: HTTP
+      monitors: [{get_resource: web-monitor}]
+      subnet_id: {get_param: subnet_id}
+      lb_method: ROUND_ROBIN
+      vip:
+        protocol_port: 80
+  web-lb:
+    type: OS::Neutron::LoadBalancer
+    properties:
+      protocol_port: 80
+      pool_id: {get_resource: web-pool}
+
+
+  wb-floating:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: {get_param: external}
+      port_id: {get_attr: [web-pool, vip, port_id]}
+
+  web_server_group:
+    type: OS::Heat::AutoScalingGroup
+    properties:
+      min_size: 1
+      max_size: 2
+      resource:
+        type: web_server.yaml
+        properties:
+          flavor: {get_param: web-flavor}
+          image: {get_param: web-image}
+          key_name: {get_param: key}
+          network: {get_param: network}
+          pool_id: {get_resource: web-pool}
+          metadata: {"metering.stack": {get_param: "OS::stack_id"}}
+          db_host: {get_attr: [db-pool, vip, address]}
+          db_name: { get_param: db_name }
+          db_user: { get_param: db_user }
+          db_password: { get_param: db_password }
+
+  web_server_scaleup_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: web_server_group}
+      cooldown: 300
+      scaling_adjustment: 1
+  web_server_scaledown_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: web_server_group}
+      cooldown: 300
+      scaling_adjustment: -1
+  web_cpu_alarm_high:
+    type: OS::Ceilometer::Alarm
+    properties:
+      description: Scale-up if the average CPU > 80% for 1 minute
+      meter_name: cpu_util
+      statistic: avg
+      period: 60
+      evaluation_periods: 1
+      threshold: 80
+      alarm_actions:
+        - {get_attr: [web_server_scaleup_policy, alarm_url]}
+      matching_metadata: {'metadata.user_metadata.stack': {get_param: "OS::stack_id"}}
+      comparison_operator: gt
+  web_cpu_alarm_low:
+    type: OS::Ceilometer::Alarm
+    properties:
+      description: Scale-down if the average CPU < 30% for 1 minutes
+      meter_name: cpu_util
+      statistic: avg
+      period: 60
+      evaluation_periods: 1
+      threshold: 30
+      alarm_actions:
+        - {get_attr: [web_server_scaledown_policy, alarm_url]}
+      matching_metadata: {'metadata.user_metadata.stack': {get_param: "OS::stack_id"}}
+      comparison_operator: lt
+
+
+  db-monitor:
+    type: OS::Neutron::HealthMonitor
+    properties:
+      type: TCP
+      delay: 5
+      max_retries: 5
+      timeout: 5
+  db-pool:
+    type: OS::Neutron::Pool
+    properties:
+      protocol: TCP
+      monitors: [{get_resource: db-monitor}]
+      subnet_id: {get_param: subnet_id}
+      lb_method: ROUND_ROBIN
+      vip:
+        protocol_port: 3306
+  db-lb:
+    type: OS::Neutron::LoadBalancer
+    properties:
+      protocol_port: 3306
+      pool_id: {get_resource: db-pool}
+
+  db-master:
+    type: OS::Nova::Server
+    properties:
+      flavor: {get_param: db-flavor}
+      image: {get_param: db-image}
+      key_name: {get_param: key}
+      networks:
+        - network: {get_param: network}
+      user_data_format: SOFTWARE_CONFIG
+
+  db-master-config:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      inputs:
+#        - name: db_rootpassword
+        - name: db_name
+        - name: db_user
+        - name: db_password
+        - name: host
+      group: script
+      config:
+        get_file: db-master.sh
+
+  db-master-deployment:
+    type: OS::Heat::SoftwareDeployment
+    properties:
+      config:
+        get_resource: db-master-config
+      server:
+        get_resource: db-master
+      input_values:
+#        db_rootpassword: { get_param: db_root_password }
+        db_name: { get_param: db_name }
+        db_user: { get_param: db_user }
+        db_password: { get_param: db_password }
+        host: { get_attr: [db-master, first_address]}
+
+  db_slave_group:
+    type: OS::Heat::AutoScalingGroup
+    properties:
+      min_size: 1
+      max_size: 5
+      resource:
+        type: db_server.yaml
+        properties:
+          flavor: {get_param: db-flavor}
+          image: {get_param: db-image}
+          key_name: {get_param: key}
+          network: {get_param: network}
+          pool_id: {get_resource: db-pool}
+          metadata: {"metering.stack": '44e01704-bb00-41e0-bdf0-84456cc4eb27'}
+          master: { get_attr: [ db-master, first_address ]}
+#          db_rootpassword: { get_param: db_root_password }
+  db_server_scaleup_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: db_slave_group}
+      cooldown: 300
+      scaling_adjustment: 1
+  db_server_scaledown_policy:
+    type: OS::Heat::ScalingPolicy
+    properties:
+      adjustment_type: change_in_capacity
+      auto_scaling_group_id: {get_resource: db_slave_group}
+      cooldown: 300
+      scaling_adjustment: -1
+  db_cpu_alarm_high:
+    type: OS::Ceilometer::Alarm
+    properties:
+      description: Scale-up if the average CPU > 80% for 1 minute
+      meter_name: cpu_util
+      statistic: avg
+      period: 60
+      evaluation_periods: 1
+      threshold: 80
+      alarm_actions:
+        - {get_attr: [db_server_scaleup_policy, alarm_url]}
+      matching_metadata: {'metadata.user_metadata.stack': '44e01704-bb00-41e0-bdf0-84456cc4eb27'}
+      comparison_operator: gt
+  db_cpu_alarm_low:
+    type: OS::Ceilometer::Alarm
+    properties:
+      description: Scale-down if the average CPU < 30% for 1 minutes
+      meter_name: cpu_util
+      statistic: avg
+      period: 60
+      evaluation_periods: 1
+      threshold: 30
+      alarm_actions:
+        - {get_attr: [db_server_scaledown_policy, alarm_url]}
+      matching_metadata: {'metadata.user_metadata.stack': '44e01704-bb00-41e0-bdf0-84456cc4eb27'}
+      comparison_operator: lt
+
+
+outputs:
+  wordpress_url:
+    value:
+      str_replace:
+        template: http://url/wordpress
+        params:
+          url: {get_attr: [web-pool, vip, address]}
+    description: The url of wordpress blog
+ 
+  master: 
+    value: { get_attr: [ db-master, first_address ]}
+    description: The ip address of master instance

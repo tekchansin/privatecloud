@@ -46,7 +46,7 @@ resources:
     properties:
       network: {get_param: network}
       security_groups:
-        - wp_security_group
+        - web_security_group
 outputs:
   server_ip:
     description: IP Address of the load-balanced server.

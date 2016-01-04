@@ -22,11 +22,11 @@ parameters:
   network:
     type: string
     description: Network used by the server
-    default:  5116d220-858f-4ec2-a735-37f2855fa3d9
+    default:  24a88e36-fd6d-446d-8e0c-5edee3b79d1d
   subnet_id:
     type: string
     description: subnet on which the load balancer will be located
-    default: b0e17783-56e3-40c9-84f6-d2b1d2b69f15
+    default: 70aa7e50-a182-4ac8-a071-d664dda1c297
   database_name:
     type: string
     description: Name of the wordpress DB
@@ -38,7 +38,7 @@ parameters:
   public_network:
     type: string
     description: UUID of a Neutron external network
-    default: eab1f09e-cbe8-439d-87d8-a11dd27050f1
+    default: 9edf95ac-bd78-4988-91d3-b41affaddc11
     
 
 resources:   
@@ -48,6 +48,22 @@ resources:
       cloud_config:
         runcmd:
           - yum update -y
+          - setenforce 0
+          - cat << MARIA > /etc/yum.repos.d/mariadb.repo
+            [mariadb]
+            name = MariaDB
+            baseurl = http://yum.mariadb.org/10.0/centos7-amd64
+            gpgkey=https://yum.mariadb.org/RPM-GPG-KEY-MariaDB
+            gpgcheck=1
+            MARIA
+          - yum install MariaDB-Galera-server MariaDB-client galera -y
+          - yum install socat
+          - service mysql start
+          - yum install firewalld
+          - systemctl start firewalld
+          - systemctl enable firewalld
+          - for i in 3306 4444 4567 4568; do sudo firewall-cmd --permanent --add-port=$i/tcp; done;
+          - firewall-cmd --reload
 
   dbserver1:
     type: OS::Nova::Server

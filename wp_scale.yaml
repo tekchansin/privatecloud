@@ -22,11 +22,11 @@ parameters:
   network:
     type: string
     description: Network used by the server
-    default:  71717835-9853-4157-9caf-170b5eba23c7
+    default:  24a88e36-fd6d-446d-8e0c-5edee3b79d1d
   subnet_id:
     type: string
     description: subnet on which the load balancer will be located
-    default: 51de5081-dd0a-47fe-a23a-29704dc53e18
+    default: 70aa7e50-a182-4ac8-a071-d664dda1c297
   database_name:
     type: string
     description: Name of the wordpress DB
@@ -38,7 +38,7 @@ parameters:
   public_network:
     type: string
     description: UUID of a Neutron external network
-    default: eab1f09e-cbe8-439d-87d8-a11dd27050f1
+    default: 9edf95ac-bd78-4988-91d3-b41affaddc11
     
 resources:
   database_password:

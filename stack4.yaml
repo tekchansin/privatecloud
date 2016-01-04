@@ -16,15 +16,15 @@ parameters:
   network:
     type: string
     description: Network used by the server
-    default: 647fc0f1-874f-4781-8c79-99bbedf53214 
+    default: 24a88e36-fd6d-446d-8e0c-5edee3b79d1d
   subnet_id:
     type: string
     description: subnet on which the load balancer will be located
-    default: 30228662-7fb3-4d47-93f0-acd7d72fe279
+    default: 70aa7e50-a182-4ac8-a071-d664dda1c297
   external_network_id:
     type: string
     description: UUID of a Neutron external network
-    default: c61fe76f-25ba-4fa6-a3f7-37d59fe17999
+    default: 9edf95ac-bd78-4988-91d3-b41affaddc11
     
   hostip:
     type: string
