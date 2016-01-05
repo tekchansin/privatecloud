@@ -215,6 +215,7 @@ resources:
           metadata: {"metering.stack": '44e01704-bb00-41e0-bdf0-84456cc4eb27'}
           master: { get_attr: [ db-master, first_address ]}
 #          db_rootpassword: { get_param: db_root_password }
+
   db_server_scaleup_policy:
     type: OS::Heat::ScalingPolicy
     properties:
@@ -229,6 +230,7 @@ resources:
       auto_scaling_group_id: {get_resource: db_slave_group}
       cooldown: 300
       scaling_adjustment: -1
+      
   db_cpu_alarm_high:
     type: OS::Ceilometer::Alarm
     properties:
@@ -261,9 +263,9 @@ outputs:
   wordpress_url:
     value:
       str_replace:
-        template: http://url/wordpress
+        template: http://url/
         params:
-          url: {get_attr: [web-pool, vip, address]}
+          url: {get_attr: [wb-floating, floating_ip_address]}
     description: The url of wordpress blog
  
   master: 
