@@ -3,6 +3,7 @@ yum install epel-release
 yum install qemu-img
 yum install python-pip git
 pip install git+git://git.openstack.org/openstack/dib-utils.git
+git clone https://git.openstack.org/openstack/diskimage-builder.git
 export ELEMENTS_PATH=tripleo-image-elements/elements:heat-templates/hot/software-config/elements
 export BASE_ELEMENTS="centos7 selinux-permissive"
 export AGENT_ELEMENTS="os-collect-config os-refresh-config os-apply-config"
