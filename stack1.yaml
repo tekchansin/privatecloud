@@ -7,7 +7,7 @@ parameters:
     type: string
     label: Image name or ID
     description: Image to be used for compute instance
-    default: CentOS-7-x86_64-generic
+    default: CentOS-7-x86_64-Generic
   flavor:
     type: string
     label: Flavor
@@ -33,3 +33,8 @@ resources:
       key_name: { get_param: key }
       networks:
         - network: { get_param: private_network }
+
+outputs:
+  instance_ip:
+    description: IP address of the instance
+    value: { get_attr: [my_instance, first_address] }

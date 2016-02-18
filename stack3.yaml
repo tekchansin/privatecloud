@@ -21,15 +21,15 @@ parameters:
   image:
     type: string
     description: Name of image to use for servers
-    default: CentOS-7-x86_64
+    default: CentOS-7-x86_64-Generic
     constraints:
-      - allowed_values: [CentOS-7-x86_64]
-        description: Image Name must be CentOS-7-x86_64
+      - allowed_values: [CentOS-7-x86_64-Generic]
+        description: Image Name must be CentOS-7-x86_64-Generic
   public_net_id:
     type: string
     label: Public network ID
     description: ID of the public network to use
-    default: c61fe76f-25ba-4fa6-a3f7-37d59fe17999
+    default: a11fc36d-c0d7-4123-9d76-448325381ece
     
 resources:
   private_network:
@@ -66,6 +66,7 @@ resources:
     properties:
       cloud_config:
         runcmd:
+          - echo root:centos | chpasswd
           - yum update -y
           - rpm -ivh https://dl.fedoraproject.org/pub/epel/6Server/x86_64/stress-1.0.4-4.el6.x86_64.rpm
           - stress --cpu 1 --timeout 3m

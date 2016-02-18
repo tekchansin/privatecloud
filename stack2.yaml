@@ -7,9 +7,9 @@ parameters:
   image:
     type: string
     description: Name of image to use for servers
-    default: CentOS-7-x86_64
+    default: CentOS-7-x86_64-Generic
     constraints:
-      - allowed_values: [CentOS-7-x86_64]
+      - allowed_values: [CentOS-7-x86_64-Generic]
         description: Image Name must be CentOS-7-x86_64
   flavor:
     type: string
@@ -62,15 +62,15 @@ parameters:
   public_net_id:
     type: string
     description: ID of public network for which floating IP addresses will be allocated
-    default: c61fe76f-25ba-4fa6-a3f7-37d59fe17999
+    default: a11fc36d-c0d7-4123-9d76-448325381ece
   private_net_id:
     type: string
     description: ID of private network into which servers get deployed
-    default: 7e32821a-4f6e-45f0-a148-db918edec44e
+    default: 7a79e0fa-1f0e-4a4e-99e9-225263491144
   private_subnet_id:
     type: string
     description: ID of private sub network into which servers get deployed
-    default: 63bca06b-eb52-45f1-80a1-3559b8ca50fd
+    default: c92b8a16-bbbf-4669-ac9d-1a93aed6c20e
   key_name:
     type: string
     label: Key name
@@ -137,3 +137,8 @@ resources:
       - remote_ip_prefix: 0.0.0.0/0
         protocol: icmp
         direction: ingress
+
+outputs:
+  instance_ip:
+    description: IP address of the instance
+    value: { get_attr: [dbserver, first_address] }
